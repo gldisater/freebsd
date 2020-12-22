@@ -204,7 +204,7 @@ ossl_process(device_t dev, struct cryptop *crp, int hint)
 	const struct crypto_session_params *csp;
 	struct ossl_session *s;
 	struct auth_hash *axf;
-	int error;
+	int error = 0;
 	bool fpu_entered;
 
 	s = crypto_get_driver_session(crp->crp_session);
@@ -225,14 +225,20 @@ ossl_process(device_t dev, struct cryptop *crp, int hint)
 
 	if (crp->crp_aad != NULL)
 		error = axf->Update(&ctx, crp->crp_aad, crp->crp_aad_length);
-	else
+	else if (crp->crp_aad_length != 0)
 		error = crypto_apply(crp, crp->crp_aad_start,
 		    crp->crp_aad_length, axf->Update, &ctx);
+
 	if (error)
 		goto out;
 
-	error = crypto_apply(crp, crp->crp_payload_start,
-	    crp->crp_payload_length, axf->Update, &ctx);
+	if (crp->crp_aad_length == 0 && crp->crp_payload_length == 0)
+		error = crypto_apply_buf(&crp->crp_buf, crp->crp_digest_start,
+		    crypto_buffer_len(&crp->crp_buf), axf->Update, &ctx);
+	else
+		error = crypto_apply(crp, crp->crp_payload_start,
+		    crp->crp_payload_length, axf->Update, &ctx);
+
 	if (error)
 		goto out;
 

@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <strings.h>
 #endif
 
+#include <sys/zio_checksum.h>
 #include <sys/zio_crypt.h>
 #include <sys/fs/zfs.h>
 #include <sys/zio.h>
@@ -304,6 +305,84 @@ bad:
 		printf("%s: returning error %d\n", __FUNCTION__, error);
 #endif
 	return (error);
+}
+
+int
+freebsd_hash_newsession(
+    freebsd_crypt_session_t *sessionp,
+    size_t checksum)
+{
+	int error = 0;
+	struct crypto_session_params csp;
+
+	bzero(&csp, sizeof(struct crypto_session_params));
+	csp.csp_mode = CSP_MODE_DIGEST;
+	csp.csp_auth_alg = checksum;
+	csp.csp_flags = CSP_F_SEPARATE_OUTPUT;
+	csp.csp_auth_mlen = 0;
+
+	error = crypto_newsession(&sessionp->fs_sid, &csp,
+		CRYPTOCAP_F_HARDWARE | CRYPTOCAP_F_SOFTWARE);
+	mtx_init(&sessionp->fs_lock, "FreeBSD Cryptographic Session Lock",
+		NULL, MTX_DEF);
+	sessionp->fs_done = false;
+	
+	return error;
+}
+
+int
+freebsd_hash(freebsd_crypt_session_t *input_sessionp,
+    size_t checksum,
+    uint8_t *buf,
+    uint64_t size,
+    zio_cksum_t *zcp)
+{
+	int error = 0;
+	freebsd_crypt_session_t *session = NULL;
+	struct cryptop *crp;
+ 
+	if (input_sessionp == NULL) {
+		session = kmem_zalloc(sizeof (freebsd_crypt_session_t), KM_SLEEP);
+		error = freebsd_hash_newsession(session, checksum);
+		if (error)
+			goto out;
+	} else {
+		session = input_sessionp;
+	}
+
+	crp = crypto_getreq(session->fs_sid, M_WAITOK);
+	crp->crp_op = CRYPTO_OP_COMPUTE_DIGEST;
+	crp->crp_flags = CRYPTO_F_CBIFSYNC | CRYPTO_F_CBIMM;
+	crp->crp_digest_start = 0;
+	crypto_use_buf(crp, buf, size);
+	crypto_use_output_buf(crp, zcp, sizeof(zio_cksum_t));
+
+	error = zfs_crypto_dispatch(session, crp);
+
+	if (!session->fs_done || !(crp->crp_flags & CRYPTO_F_DONE) || (crp->crp_etype))
+		error = EINVAL;
+ 
+	crypto_freereq(crp);
+
+out:
+	if (input_sessionp == NULL) {
+		freebsd_crypt_freesession(session);
+		kmem_free(session, sizeof (freebsd_crypt_session_t));
+	}
+
+#ifdef FCRYPTO_DEBUG
+	if (error)
+		printf("\n%s: returning error %d\n", __FUNCTION__, error);
+ 
+	printf("\nInput buffer size is: %lu\n", size);
+
+	uint8_t *buf2 = (uint8_t*)zcp;
+	printf ("\nOutput buffer is:\n");
+	for (int i = 0; i < sizeof(zio_cksum_t); ++i)
+		printf("%02X", buf2[i]);
+#endif
+
+	return error;
 }
 
 int
