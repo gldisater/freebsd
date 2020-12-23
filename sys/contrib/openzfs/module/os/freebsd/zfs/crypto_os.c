@@ -335,7 +335,8 @@ freebsd_hash(freebsd_crypt_session_t *input_sessionp,
     size_t checksum,
     uint8_t *buf,
     uint64_t size,
-    zio_cksum_t *zcp)
+    void *obuf,
+    uint64_t osize)
 {
 	int error = 0;
 	freebsd_crypt_session_t *session = NULL;
@@ -355,7 +356,7 @@ freebsd_hash(freebsd_crypt_session_t *input_sessionp,
 	crp->crp_flags = CRYPTO_F_CBIFSYNC | CRYPTO_F_CBIMM;
 	crp->crp_digest_start = 0;
 	crypto_use_buf(crp, buf, size);
-	crypto_use_output_buf(crp, zcp, sizeof(zio_cksum_t));
+	crypto_use_output_buf(crp, obuf, osize);
 
 	error = zfs_crypto_dispatch(session, crp);
 
@@ -376,11 +377,36 @@ out:
  
 	printf("\nInput buffer size is: %lu\n", size);
 
-	uint8_t *buf2 = (uint8_t*)zcp;
 	printf ("\nOutput buffer is:\n");
-	for (int i = 0; i < sizeof(zio_cksum_t); ++i)
-		printf("%02X", buf2[i]);
+	for (int i = 0; i < osize; ++i)
+		printf("%02X", obuf[i]);
 #endif
+
+	return error;
+}
+
+int
+freebsd_offload_sha_to_ocf(uint64_t checksum,
+    abd_t *abd,
+    uint64_t size,
+    zio_cksum_t *zcp)
+{ 
+	int error = 0;
+	freebsd_crypt_session_t *session = NULL;
+
+	session = kmem_zalloc(sizeof(freebsd_crypt_session_t), KM_SLEEP);
+	error = freebsd_hash_newsession(session, checksum);
+
+	if (error == 0) {
+		uint8_t *buf = abd_borrow_buf_copy(abd, size);
+		error = freebsd_hash(session, checksum, buf, size, obuf, osize);
+		abd_return_buf(abd, buf, size);
+	}
+
+	if (session != NULL) {
+		freebsd_crypt_freesession(session);
+		kmem_free(session, sizeof(freebsd_crypt_session_t));
+	}
 
 	return error;
 }
