@@ -55,7 +55,7 @@ abd_checksum_SHA256(abd_t *abd, uint64_t size,
 	zio_cksum_t tmp;
 
 #ifdef _KERNEL
-	if (freebsd_offload_hash_to_ocf(abd, size, zcp) == 0)
+	if (freebsd_offload_hash_to_ocf(CRYPTO_SHA2_256, abd, size, zcp) == 0)
 		goto bswap;
 #endif
 
