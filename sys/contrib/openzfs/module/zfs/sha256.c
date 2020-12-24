@@ -55,23 +55,8 @@ abd_checksum_SHA256(abd_t *abd, uint64_t size,
 	zio_cksum_t tmp;
 
 #ifdef _KERNEL
-	freebsd_crypt_session_t *session = NULL;
-
-	session = kmem_zalloc(sizeof (freebsd_crypt_session_t), KM_SLEEP);
-	ret = freebsd_hash_newsession(session, CRYPTO_SHA2_256);
-	
-	if (ret == 0) {
-		uint8_t *buf = abd_borrow_buf_copy(abd, size);
-		ret = freebsd_hash(session, CRYPTO_SHA2_256, buf, size, &tmp);
-		abd_return_buf(abd, buf, size);
-	}
-
-	if (session != NULL) {
-		freebsd_crypt_freesession(session);
-		kmem_free(session, sizeof (freebsd_crypt_session_t));
-	}
-
-	if (ret == 0) goto bswap;
+	if (freebsd_offload_hash_to_ocf(abd, size, zcp) == 0)
+		goto bswap;
 #endif
 
 	if (qat_checksum_use_accel(size)) {
@@ -108,28 +93,6 @@ abd_checksum_SHA512_native(abd_t *abd, uint64_t size,
     const void *ctx_template, zio_cksum_t *zcp)
 {
 	SHA2_CTX	ctx;
-/* needs to send a bigger buffer in instead of zcp and then copy only the zcp size out
-#ifdef _KERNEL
-	int ret = 0;
-	freebsd_crypt_session_t *session = NULL;
-
-	session = kmem_zalloc(sizeof (freebsd_crypt_session_t), KM_SLEEP);
-	ret = freebsd_hash_newsession(session, CRYPTO_SHA2_512);
-
-	if (ret == 0) {
-		uint8_t *buf = abd_borrow_buf_copy(abd, size);
-		ret = freebsd_hash(session, CRYPTO_SHA2_512, buf, size, zcp);
-		abd_return_buf(abd, buf, size);
-	}
-	
-	if (session != NULL) {
-		freebsd_crypt_freesession(session);
-		kmem_free(session, sizeof (freebsd_crypt_session_t));
-	}
-
-	if (ret == 0) return;
-#endif
-*/
 	SHA2Init(SHA512_256, &ctx);
 	(void) abd_iterate_func(abd, 0, size, sha_incremental, &ctx);
 	SHA2Final(zcp, &ctx);
