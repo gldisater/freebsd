@@ -95,7 +95,7 @@ void freebsd_crypt_freesession(freebsd_crypt_session_t *sessp);
 int freebsd_hash_newsession(freebsd_crypt_session_t *sessionp,
 	size_t checksum);
 int freebsd_hash(freebsd_crypt_session_t *input_sessionp,
-	size_t checksum, uint8_t *buf, uint64_t size, zio_cksum_t *zcp);
+	size_t checksum, uint8_t *buf, uint64_t size, void *obuf, uint64_t osize);
 int freebsd_offload_hash_to_ocf(uint64_t checksum, abd_t *abd,
 	uint64_t size, zio_cksum_t *zcp);
 
