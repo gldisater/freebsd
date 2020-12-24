@@ -322,7 +322,7 @@ freebsd_hash_newsession(
 	csp.csp_auth_mlen = 0;
 
 	error = crypto_newsession(&sessionp->fs_sid, &csp,
-		CRYPTOCAP_F_HARDWARE | CRYPTOCAP_F_SOFTWARE);
+		CRYPTOCAP_F_HARDWARE | CRYPTOCAP_F_ACCEL_SOFTWARE);
 	mtx_init(&sessionp->fs_lock, "FreeBSD Cryptographic Session Lock",
 		NULL, MTX_DEF);
 	sessionp->fs_done = false;
@@ -386,20 +386,23 @@ out:
 }
 
 int
-freebsd_offload_sha_to_ocf(uint64_t checksum,
+freebsd_offload_hash_to_ocf(uint64_t checksum,
     abd_t *abd,
     uint64_t size,
     zio_cksum_t *zcp)
 { 
-	int error = 0;
+	int error = 1;
 	freebsd_crypt_session_t *session = NULL;
 
 	session = kmem_zalloc(sizeof(freebsd_crypt_session_t), KM_SLEEP);
-	error = freebsd_hash_newsession(session, checksum);
+
+	if (session != NULL)
+		error = freebsd_hash_newsession(session, checksum);
 
 	if (error == 0) {
 		uint8_t *buf = abd_borrow_buf_copy(abd, size);
-		error = freebsd_hash(session, checksum, buf, size, obuf, osize);
+		error = freebsd_hash(session, checksum, buf, size, zcp,
+							 sizeof(zio_cksum_t));
 		abd_return_buf(abd, buf, size);
 	}
 
@@ -573,6 +576,16 @@ freebsd_crypt_newsession(freebsd_crypt_session_t *sessp,
 	crypt_sessions++;
 bad:
 	return (error);
+}
+
+/* Not implmented on older versions of FreeBSD */
+int
+freebsd_offload_hash_to_ocf(uint64_t checksum,
+	abd_t *abd,
+	uint64_t size,
+	zio_cksum_t *zcp)
+{
+	return 1;
 }
 
 /*
