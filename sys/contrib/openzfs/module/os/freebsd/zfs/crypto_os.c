@@ -335,7 +335,7 @@ freebsd_hash(freebsd_crypt_session_t *input_sessionp,
     size_t checksum,
     uint8_t *buf,
     uint64_t size,
-    void *obuf,
+    uint8_t *obuf,
     uint64_t osize)
 {
 	int error = 0;
