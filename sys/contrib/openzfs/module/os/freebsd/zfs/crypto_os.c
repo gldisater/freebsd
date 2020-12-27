@@ -401,7 +401,7 @@ freebsd_offload_hash_to_ocf(uint64_t checksum,
 
 	if (error == 0) {
 		uint8_t *buf = abd_borrow_buf_copy(abd, size);
-		error = freebsd_hash(session, checksum, buf, size, zcp,
+		error = freebsd_hash(session, checksum, buf, size, (uint8_t*)zcp,
 							 sizeof(zio_cksum_t));
 		abd_return_buf(abd, buf, size);
 	}
