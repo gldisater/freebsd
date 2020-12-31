@@ -295,7 +295,7 @@ freebsd_crypt_newsession(freebsd_crypt_session_t *sessp,
 		goto bad;
 	}
 	error = crypto_newsession(&sessp->fs_sid, &csp,
-	    CRYPTOCAP_F_HARDWARE | CRYPTOCAP_F_SOFTWARE);
+	    CRYPTOCAP_F_HARDWARE | CRYPTOCAP_F_ACCEL_SOFTWARE | CRYPTOCAP_F_SOFTWARE);
 	mtx_init(&sessp->fs_lock, "FreeBSD Cryptographic Session Lock",
 	    NULL, MTX_DEF);
 	crypt_sessions++;
@@ -353,7 +353,7 @@ freebsd_hash(freebsd_crypt_session_t *input_sessionp,
 
 	crp = crypto_getreq(session->fs_sid, M_WAITOK);
 	crp->crp_op = CRYPTO_OP_COMPUTE_DIGEST;
-    crp->crp_flags = CRYPTO_F_CBIFSYNC | CRYPTO_F_CBIMM;
+	crp->crp_flags = CRYPTO_F_CBIFSYNC | CRYPTO_F_CBIMM;
 	crp->crp_digest_start = 0;
 	crypto_use_buf(crp, buf, size);
 	crypto_use_output_buf(crp, obuf, osize);
