@@ -353,11 +353,7 @@ freebsd_hash(freebsd_crypt_session_t *input_sessionp,
 
 	crp = crypto_getreq(session->fs_sid, M_WAITOK);
 	crp->crp_op = CRYPTO_OP_COMPUTE_DIGEST;
-<<<<<<< HEAD
 	crp->crp_flags = CRYPTO_F_CBIFSYNC | CRYPTO_F_CBIMM;
-=======
-// crp->crp_flags = CRYPTO_F_CBIFSYNC | CRYPTO_F_CBIMM;
->>>>>>> c751d2078ecbec6d10e3cef98d3c3e3738fa9b7d
 	crp->crp_digest_start = 0;
 	crypto_use_buf(crp, buf, size);
 	crypto_use_output_buf(crp, obuf, osize);
