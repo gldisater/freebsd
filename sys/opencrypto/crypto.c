@@ -1376,7 +1376,8 @@ crp_sanity(struct cryptop *crp)
 		KASSERT(crp->crp_payload_output_start == 0 ||
 		    crp->crp_payload_output_start < olen,
 		    ("invalid payload output start"));
-		KASSERT(crp->crp_payload_output_start +
+		KASSERT(csp->csp_mode == CSP_MODE_DIGEST ||
+		    crp->crp_payload_output_start +
 		    crp->crp_payload_length <= olen,
 		    ("payload outside output buffer"));
 	}
